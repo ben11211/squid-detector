@@ -1,4 +1,4 @@
-# straight-pipe-logger
+# squid-detector
 
 Logs how loud passing cars are. ESP32 + INMP441 (A-weighted dB) + BME280 → InfluxDB 1.x (1 s) + Home Assistant (10 min) → Grafana.
 
