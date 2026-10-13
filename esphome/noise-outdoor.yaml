@@ -1,0 +1,14 @@
+# noise-outdoor - outdoor unit
+# Shared logic lives in noise-common.yaml; this file only sets identity and credentials.
+
+substitutions:
+  device_name: noise-outdoor
+  friendly_name: Noise Outdoor
+  location_tag: outdoor         # tag on every InfluxDB point
+  api_key: !secret outdoor_api_key
+  ota_password: !secret outdoor_ota_password
+  influx_host: !secret influx_host
+  influx_auth: !secret outdoor_influx_auth   # "Basic <base64 user:password>"
+
+packages:
+  common: !include noise-common.yaml

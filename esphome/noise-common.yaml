@@ -1,0 +1,253 @@
+# Noise logger V1 - shared config for noise-indoor and noise-outdoor.
+# ESP32 + INMP441 + BME280 over Wi-Fi -> InfluxDB (1 s series) + Home Assistant (10-min summaries).
+# Device files set: device_name, friendly_name, location_tag, api_key, ota_password, influx_host, influx_auth.
+
+substitutions:
+  upload_every: 15s           # how often to push buffered data to Influx
+  batch_size: "300"           # max points per series per upload
+  max_buffer: "2400"          # max seconds buffered while offline (~40 min)
+  loud_threshold: "75.0"      # dBA; a pass above this counts as a "loud event"
+  mic_offset: 0dB             # calibration offset vs. a reference meter (override per device)
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://stas-sl/esphome-sound-level-meter
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: ${api_key}
+
+ota:
+  - platform: esphome
+    password: ${ota_password}
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: light      # roughly halves Wi-Fi power draw
+
+time:
+  - platform: sntp
+    id: sntp_time
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+
+http_request:
+  timeout: 10s
+  verify_ssl: false
+
+globals:
+  - id: laeq_buf              # (unix time, dBA)
+    type: std::vector<std::pair<uint32_t, float>>
+  - id: lamax_buf
+    type: std::vector<std::pair<uint32_t, float>>
+  - id: pending_body
+    type: std::string
+  - id: pending_n1
+    type: size_t
+    initial_value: "0"
+  - id: pending_n2
+    type: size_t
+    initial_value: "0"
+  - id: loud_events
+    type: int
+    initial_value: "0"
+  - id: above_threshold
+    type: bool
+    initial_value: "false"
+
+i2s:
+  bck_pin: 23
+  ws_pin: 18
+  din_pin: 19
+  sample_rate: 48000
+  bits_per_sample: 32
+  dma_buf_count: 8
+  dma_buf_len: 256
+  use_apll: true
+  channel: left               # L/R tied to GND -> mic sends on the left slot (right read random bits, ~95 dBA indoors)
+  bits_shift: 8
+
+sound_level_meter:
+  id: slm
+  update_interval: 600s
+  buffer_size: 1024
+  warmup_interval: 500ms
+  mic_sensitivity: -26dB      # INMP441 datasheet
+  mic_sensitivity_ref: 94dB
+  offset: ${mic_offset}
+  groups:
+    - filters:
+        # INMP441 low-frequency correction
+        - type: sos
+          coeffs:
+            - [1.0019784, -1.9908513, 0.9889158, -1.9951786, 0.99518436]
+      groups:
+        - filters:
+            # A-weighting (48 kHz)
+            - type: sos
+              coeffs:
+                - [0.16999495,  0.741029,  0.52548885, -0.11321865, -0.056549273]
+                - [1.0,        -2.00027,   1.0002706,  -0.03433284, -0.79215795]
+                - [1.0,        -0.709303, -0.29071867, -1.9822421,   0.9822986]
+          sensors:
+            # 1-second series -> buffered for InfluxDB (not sent to HA)
+            - type: eq
+              name: LAeq 1s
+              id: laeq_1s
+              update_interval: 1s
+              internal: true
+              on_value:
+                - lambda: |-
+                    auto now = id(sntp_time).now();
+                    if (!now.is_valid() || !std::isfinite(x)) return;   // silence = -inf, Influx rejects it
+                    auto &b = id(laeq_buf);
+                    if (b.size() >= ${max_buffer}) b.erase(b.begin());
+                    b.emplace_back((uint32_t) now.timestamp, x);
+
+            - type: max
+              name: LAFmax 1s
+              id: lafmax_1s
+              window_size: 125ms
+              update_interval: 1s
+              internal: true
+              on_value:
+                - lambda: |-
+                    if (std::isfinite(x)) {
+                      if (x >= ${loud_threshold} && !id(above_threshold)) {
+                        id(loud_events) += 1;
+                        id(above_threshold) = true;
+                      } else if (x < ${loud_threshold} - 3.0) {
+                        id(above_threshold) = false;   // 3 dB hysteresis
+                      }
+                    }
+                    auto now = id(sntp_time).now();
+                    if (!now.is_valid() || !std::isfinite(x)) return;   // silence = -inf, Influx rejects it
+                    auto &b = id(lamax_buf);
+                    if (b.size() >= ${max_buffer}) b.erase(b.begin());
+                    b.emplace_back((uint32_t) now.timestamp, x);
+
+            # 10-minute summaries -> Home Assistant
+            - type: eq
+              name: LAeq 10min
+              id: laeq_10min
+              unit_of_measurement: dBA
+              on_value:
+                - lambda: |-
+                    id(loud_count).publish_state(id(loud_events));
+                    id(loud_events) = 0;
+            - type: max
+              name: LAmax 10min
+              window_size: 1s
+              unit_of_measurement: dBA
+            - type: min
+              name: LAmin 10min
+              window_size: 1s
+              unit_of_measurement: dBA
+
+sensor:
+  - platform: template
+    name: Loud events 10min
+    id: loud_count
+    unit_of_measurement: events
+    accuracy_decimals: 0
+    state_class: measurement
+    update_interval: never
+
+  - platform: template
+    name: Buffer backlog
+    unit_of_measurement: s
+    accuracy_decimals: 0
+    update_interval: 60s
+    entity_category: diagnostic
+    lambda: 'return id(laeq_buf).size();'
+
+  # BME280 - outdoors: outside the box, in a radiation shield
+  - platform: bme280_i2c
+    address: 0x76
+    update_interval: 60s
+    temperature:
+      name: Temperature
+    humidity:
+      name: Humidity
+    pressure:
+      name: Pressure
+
+  - platform: wifi_signal
+    name: WiFi signal
+    update_interval: 120s
+    entity_category: diagnostic
+
+# Batch upload to InfluxDB (v1 line protocol)
+script:
+  - id: upload_batch
+    mode: single
+    then:
+      - lambda: |-
+          auto &a = id(laeq_buf);
+          auto &m = id(lamax_buf);
+          size_t n1 = std::min(a.size(), (size_t) ${batch_size});
+          size_t n2 = std::min(m.size(), (size_t) ${batch_size});
+          std::string body;
+          body.reserve((n1 + n2) * 48);
+          char line[80];
+          for (size_t i = 0; i < n1; i++) {
+            snprintf(line, sizeof(line), "noise,location=${location_tag} laeq_1s=%.1f %u\n",
+                     a[i].second, (unsigned) a[i].first);
+            body += line;
+          }
+          for (size_t i = 0; i < n2; i++) {
+            snprintf(line, sizeof(line), "noise,location=${location_tag} lafmax_1s=%.1f %u\n",
+                     m[i].second, (unsigned) m[i].first);
+            body += line;
+          }
+          id(pending_body) = std::move(body);
+          id(pending_n1) = n1;
+          id(pending_n2) = n2;
+      - http_request.post:
+          # Credentials go in a header, not the URL: ESPHome logs the URL when a request fails.
+          url: http://${influx_host}:8086/write?db=noise&precision=s
+          request_headers:
+            Authorization: ${influx_auth}
+          body: !lambda 'return id(pending_body);'
+          on_response:
+            then:
+              - lambda: |-
+                  if (response->status_code == 204) {
+                    auto &a = id(laeq_buf);
+                    auto &m = id(lamax_buf);
+                    a.erase(a.begin(), a.begin() + std::min(id(pending_n1), a.size()));
+                    m.erase(m.begin(), m.begin() + std::min(id(pending_n2), m.size()));
+                    ESP_LOGI("noise", "Uploaded %u + %u points, %u left",
+                             (unsigned) id(pending_n1), (unsigned) id(pending_n2),
+                             (unsigned) a.size());
+                  } else {
+                    ESP_LOGW("noise", "InfluxDB returned HTTP %d, keeping data buffered",
+                             response->status_code);
+                  }
+                  id(pending_body).clear();
+                  id(pending_body).shrink_to_fit();
+
+interval:
+  - interval: ${upload_every}
+    then:
+      - if:
+          condition:
+            and:
+              - wifi.connected:
+              - lambda: 'return !id(laeq_buf).empty() || !id(lamax_buf).empty();'
+          then:
+            - script.execute: upload_batch

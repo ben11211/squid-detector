@@ -1,0 +1,202 @@
+{
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influx-noise"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisSoftMax": 90,
+            "axisSoftMin": 30,
+            "lineWidth": 1,
+            "spanNulls": 120000
+          },
+          "min": 20,
+          "unit": "dB"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "alias": "$col $tag_location",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influx-noise"
+          },
+          "query": "SELECT 10*log10(mean(\"e\")) AS \"LAeq\" FROM (SELECT pow(10, \"laeq_1s\"/10) AS \"e\" FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND $timeFilter GROUP BY \"location\") WHERE $timeFilter GROUP BY time($__interval), \"location\" fill(null)",
+          "rawQuery": true,
+          "refId": "A",
+          "resultFormat": "time_series"
+        },
+        {
+          "alias": "$col $tag_location",
+          "query": "SELECT max(\"lafmax_1s\") AS \"LAFmax\" FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND $timeFilter GROUP BY time($__interval), \"location\" fill(null)",
+          "rawQuery": true,
+          "refId": "B",
+          "resultFormat": "time_series"
+        }
+      ],
+      "title": "Road noise (dBA)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influx-noise"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "unit": "dB"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "id": 2,
+      "targets": [
+        {
+          "alias": "$col $tag_location",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influx-noise"
+          },
+          "query": "SELECT last(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND $timeFilter GROUP BY \"location\"",
+          "rawQuery": true,
+          "refId": "A",
+          "resultFormat": "time_series"
+        }
+      ],
+      "title": "Last LAeq 1s",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influx-noise"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "unit": "dB"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "id": 3,
+      "targets": [
+        {
+          "alias": "$col $tag_location",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influx-noise"
+          },
+          "query": "SELECT max(\"lafmax_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND $timeFilter GROUP BY \"location\"",
+          "rawQuery": true,
+          "refId": "A",
+          "resultFormat": "time_series"
+        }
+      ],
+      "title": "Loudest pass (range)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influx-noise"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "id": 4,
+      "targets": [
+        {
+          "alias": "$col $tag_location",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influx-noise"
+          },
+          "query": "SELECT count(\"lafmax_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"lafmax_1s\" >= 75 AND $timeFilter GROUP BY \"location\"",
+          "rawQuery": true,
+          "refId": "A",
+          "resultFormat": "time_series"
+        }
+      ],
+      "title": "Seconds over 75 dBA (range)",
+      "type": "stat"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "sound-logger"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": [
+            "outdoor",
+            "indoor"
+          ],
+          "value": [
+            "outdoor",
+            "indoor"
+          ]
+        },
+        "includeAll": false,
+        "label": "Unit",
+        "multi": true,
+        "name": "unit",
+        "options": [
+          {
+            "selected": true,
+            "text": "outdoor",
+            "value": "outdoor"
+          },
+          {
+            "selected": true,
+            "text": "indoor",
+            "value": "indoor"
+          }
+        ],
+        "query": "outdoor,indoor",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Noise",
+  "uid": "road-noise"
+}
