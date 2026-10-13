@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Administer the Home Assistant side of the logger from the terminal.
 
-    homelab.py influx "SHOW DATABASES"              InfluxQL as InfluxDB admin (--db noise)
-    homelab.py supervisor get /addons               HA Supervisor API (add-ons, updates, host)
-    homelab.py addon a0d7b954_grafana get /api/health  an add-on's own web API (via HA ingress)
-    homelab.py add-esphome noise-outdoor.local KEY_FILE  add an ESPHome device to HA
+    hactl.py influx "SHOW DATABASES"              InfluxQL as InfluxDB admin (--db noise)
+    hactl.py supervisor get /addons               HA Supervisor API (add-ons, updates, host)
+    hactl.py addon a0d7b954_grafana get /api/health  an add-on's own web API (via HA ingress)
+    hactl.py add-esphome noise-outdoor.local KEY_FILE  add an ESPHome device to HA
 
 Reads ~/.config/homelab/ha_host (or $HA_HOST) and ~/.config/homelab/ha_token (an admin
 long-lived access token). Never prints either. Needs: pip install websockets

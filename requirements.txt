@@ -1,0 +1,2 @@
+esphome==2026.9.1
+websockets>=12

@@ -4,3 +4,4 @@ esphome/.esphome/
 *.log
 __pycache__/
 .DS_Store
+.venv
