@@ -8,6 +8,11 @@ substitutions:
   max_buffer: "2400"          # max seconds buffered while offline (~40 min)
   loud_threshold: "75.0"      # dBA; a pass above this counts as a "loud event"
   mic_offset: 0dB             # calibration offset vs. a reference meter (override per device)
+  # Pass (vehicle) detection: background = quietest 1 s LAeq of the last 60 s.
+  # A pass starts when LAFmax >= background + pass_start_db, ends below background + pass_end_db.
+  pass_start_db: "8.0"
+  pass_end_db: "4.0"
+  pass_max_s: "30"            # force-end very long events (traffic jam, lawnmower)
 
 esphome:
   name: ${device_name}
@@ -68,6 +73,34 @@ globals:
   - id: above_threshold
     type: bool
     initial_value: "false"
+  # pass detection
+  - id: bg_hist               # last 60 s of LAeq, for the background level
+    type: std::vector<float>
+  - id: pass_active
+    type: bool
+    initial_value: "false"
+  - id: pass_start
+    type: uint32_t
+    initial_value: "0"
+  - id: pass_peak_t
+    type: uint32_t
+    initial_value: "0"
+  - id: pass_peak
+    type: float
+    initial_value: "0"
+  - id: pass_bg
+    type: float
+    initial_value: "0"
+  - id: pass_buf              # (peak time, peak LAFmax) of finished passes, waiting for upload
+    type: std::vector<std::pair<uint32_t, float>>
+  - id: pass_bg_buf           # background at each pass (same order as pass_buf)
+    type: std::vector<float>
+  - id: pending_n3
+    type: size_t
+    initial_value: "0"
+  - id: passes_10min
+    type: int
+    initial_value: "0"
 
 i2s:
   bck_pin: 23
@@ -112,6 +145,11 @@ sound_level_meter:
               internal: true
               on_value:
                 - lambda: |-
+                    if (std::isfinite(x)) {
+                      auto &h = id(bg_hist);
+                      if (h.size() >= 60) h.erase(h.begin());
+                      h.push_back(x);
+                    }
                     auto now = id(sntp_time).now();
                     if (!now.is_valid() || !std::isfinite(x)) return;   // silence = -inf, Influx rejects it
                     auto &b = id(laeq_buf);
@@ -136,9 +174,31 @@ sound_level_meter:
                     }
                     auto now = id(sntp_time).now();
                     if (!now.is_valid() || !std::isfinite(x)) return;   // silence = -inf, Influx rejects it
+                    uint32_t t = now.timestamp;
                     auto &b = id(lamax_buf);
                     if (b.size() >= ${max_buffer}) b.erase(b.begin());
-                    b.emplace_back((uint32_t) now.timestamp, x);
+                    b.emplace_back(t, x);
+
+                    // Pass detection: rise above the recent background, then fall back.
+                    auto &h = id(bg_hist);
+                    if (h.size() < 10) return;                        // need some history first
+                    float bg = *std::min_element(h.begin(), h.end());
+                    if (!id(pass_active)) {
+                      if (x >= bg + ${pass_start_db}) {
+                        id(pass_active) = true;
+                        id(pass_start) = t; id(pass_peak_t) = t; id(pass_peak) = x; id(pass_bg) = bg;
+                      }
+                    } else {
+                      if (x > id(pass_peak)) { id(pass_peak) = x; id(pass_peak_t) = t; }
+                      if (x < id(pass_bg) + ${pass_end_db} || t - id(pass_start) >= ${pass_max_s}) {
+                        id(pass_active) = false;
+                        id(passes_10min) += 1;
+                        auto &p = id(pass_buf);
+                        if (p.size() >= 500) { p.erase(p.begin()); id(pass_bg_buf).erase(id(pass_bg_buf).begin()); }
+                        p.emplace_back(id(pass_peak_t), id(pass_peak));
+                        id(pass_bg_buf).push_back(id(pass_bg));
+                      }
+                    }
 
             # 10-minute summaries -> Home Assistant
             - type: eq
@@ -149,6 +209,8 @@ sound_level_meter:
                 - lambda: |-
                     id(loud_count).publish_state(id(loud_events));
                     id(loud_events) = 0;
+                    id(pass_count).publish_state(id(passes_10min));
+                    id(passes_10min) = 0;
             - type: max
               name: LAmax 10min
               window_size: 1s
@@ -163,6 +225,14 @@ sensor:
     name: Loud events 10min
     id: loud_count
     unit_of_measurement: events
+    accuracy_decimals: 0
+    state_class: measurement
+    update_interval: never
+
+  - platform: template
+    name: Passes 10min
+    id: pass_count
+    unit_of_measurement: passes
     accuracy_decimals: 0
     state_class: measurement
     update_interval: never
@@ -201,9 +271,11 @@ script:
           auto &m = id(lamax_buf);
           size_t n1 = std::min(a.size(), (size_t) ${batch_size});
           size_t n2 = std::min(m.size(), (size_t) ${batch_size});
+          auto &p = id(pass_buf);
+          size_t n3 = std::min(p.size(), (size_t) ${batch_size});
           std::string body;
-          body.reserve((n1 + n2) * 48);
-          char line[80];
+          body.reserve((n1 + n2 + n3) * 48);
+          char line[112];
           for (size_t i = 0; i < n1; i++) {
             snprintf(line, sizeof(line), "noise,location=${location_tag} laeq_1s=%.1f %u\n",
                      a[i].second, (unsigned) a[i].first);
@@ -214,9 +286,15 @@ script:
                      m[i].second, (unsigned) m[i].first);
             body += line;
           }
+          for (size_t i = 0; i < n3; i++) {   // one point per detected pass, at its peak
+            snprintf(line, sizeof(line), "noise,location=${location_tag} pass_lafmax=%.1f,pass_bg=%.1f %u\n",
+                     p[i].second, id(pass_bg_buf)[i], (unsigned) p[i].first);
+            body += line;
+          }
           id(pending_body) = std::move(body);
           id(pending_n1) = n1;
           id(pending_n2) = n2;
+          id(pending_n3) = n3;
       - http_request.post:
           # Credentials go in a header, not the URL: ESPHome logs the URL when a request fails.
           url: http://${influx_host}:8086/write?db=noise&precision=s
@@ -231,9 +309,14 @@ script:
                     auto &m = id(lamax_buf);
                     a.erase(a.begin(), a.begin() + std::min(id(pending_n1), a.size()));
                     m.erase(m.begin(), m.begin() + std::min(id(pending_n2), m.size()));
-                    ESP_LOGI("noise", "Uploaded %u + %u points, %u left",
+                    auto &p = id(pass_buf);
+                    auto &pb = id(pass_bg_buf);
+                    size_t n3 = std::min(id(pending_n3), p.size());
+                    p.erase(p.begin(), p.begin() + n3);
+                    pb.erase(pb.begin(), pb.begin() + std::min(n3, pb.size()));
+                    ESP_LOGI("noise", "Uploaded %u + %u points, %u passes, %u left",
                              (unsigned) id(pending_n1), (unsigned) id(pending_n2),
-                             (unsigned) a.size());
+                             (unsigned) n3, (unsigned) a.size());
                   } else {
                     ESP_LOGW("noise", "InfluxDB returned HTTP %d, keeping data buffered",
                              response->status_code);
@@ -248,6 +331,6 @@ interval:
           condition:
             and:
               - wifi.connected:
-              - lambda: 'return !id(laeq_buf).empty() || !id(lamax_buf).empty();'
+              - lambda: 'return !id(laeq_buf).empty() || !id(lamax_buf).empty() || !id(pass_buf).empty();'
           then:
             - script.execute: upload_batch

@@ -92,7 +92,20 @@ Export (after editing in Grafana):
 bin/hactl.py addon a0d7b954_grafana get /apis/dashboard.grafana.app/v2/namespaces/default/dashboards/road-noise-all > grafana/road-noise-all.json
 ```
 
-### ESPHome device → HA
+### recount_passes.py
+
+Runs the firmware's pass-detection rule over stored 1 s data. Dry run by default.
+
+```bash
+bin/recount_passes.py --location outdoor --start 2026-10-13T04:25:00Z --end 2026-10-13T06:15:06Z            # count only
+bin/recount_passes.py --location outdoor --start ... --end ... --start-db 10 --end-db 5                       # other thresholds
+bin/recount_passes.py --location outdoor --start ... --end ... --write                                        # save, tag src=backfill
+bin/hactl.py influx "DELETE FROM noise WHERE src='backfill'" --db noise                                       # undo backfill
+```
+
+Don't backfill a range the firmware already covered (double counts). Never `DELETE` by time alone: pass points share the `noise` measurement with the 1 s data.
+
+## ESPHome device → HA
 
 ```bash
 bin/hactl.py add-esphome noise-outdoor.local ~/.config/homelab/outdoor_esphome_api_key

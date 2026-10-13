@@ -1829,6 +1829,941 @@
             }
           }
         }
+      },
+      "panel-93": {
+        "kind": "Panel",
+        "spec": {
+          "id": 93,
+          "title": "Sound level: LAmin / LAeq / LAmax",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "$col $tag_location",
+                        "query": "SELECT min(\"laeq_1s\") AS \"LAmin\" FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND $timeFilter GROUP BY time($__interval), \"location\" fill(none)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "$col $tag_location",
+                        "query": "SELECT 10*log10(mean(\"e\")) AS \"LAeq\" FROM (SELECT pow(10, \"laeq_1s\"/10) AS \"e\" FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND $timeFilter GROUP BY \"location\") WHERE $timeFilter GROUP BY time($__interval), \"location\" fill(none)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "$col $tag_location",
+                        "query": "SELECT max(\"lafmax_1s\") AS \"LAmax\" FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND $timeFilter GROUP BY time($__interval), \"location\" fill(none)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 2000,
+                "interval": "10s"
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "dB",
+                  "min": 20,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "transparent"
+                      },
+                      {
+                        "value": 75,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "custom": {
+                    "axisSoftMax": 90,
+                    "axisSoftMin": 30,
+                    "drawStyle": "points",
+                    "fillOpacity": 0,
+                    "lineWidth": 0,
+                    "pointSize": 3,
+                    "showPoints": "always",
+                    "spanNulls": true,
+                    "thresholdsStyle": {
+                      "mode": "dashed"
+                    }
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^LAmin/"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "blue",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^LAeq/"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "green",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/^LAmax/"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "orange",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-94": {
+        "kind": "Panel",
+        "spec": {
+          "id": 94,
+          "title": "Time spent per 5 dB band (seconds per bucket; selected units summed)",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "30",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 30 AND \"laeq_1s\" < 35 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "35",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 35 AND \"laeq_1s\" < 40 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "40",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 40 AND \"laeq_1s\" < 45 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "45",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 45 AND \"laeq_1s\" < 50 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "50",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 50 AND \"laeq_1s\" < 55 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "E",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "55",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 55 AND \"laeq_1s\" < 60 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "F",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "60",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 60 AND \"laeq_1s\" < 65 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "G",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "65",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 65 AND \"laeq_1s\" < 70 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "H",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "70",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 70 AND \"laeq_1s\" < 75 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "I",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "75",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 75 AND \"laeq_1s\" < 80 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "J",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "80",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 80 AND \"laeq_1s\" < 85 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "K",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "85",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 85 AND \"laeq_1s\" < 90 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "L",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "90",
+                        "query": "SELECT count(\"laeq_1s\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" >= 90 AND \"laeq_1s\" < 95 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "M",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 200,
+                "interval": "1m"
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "heatmap",
+            "version": "",
+            "spec": {
+              "options": {
+                "calculate": false,
+                "cellGap": 1,
+                "color": {
+                  "exponent": 0.5,
+                  "fill": "dark-orange",
+                  "mode": "scheme",
+                  "scale": "exponential",
+                  "scheme": "Inferno",
+                  "steps": 64
+                },
+                "filterValues": {
+                  "le": 0.5
+                },
+                "legend": {
+                  "show": true
+                },
+                "rowsFrame": {
+                  "layout": "ge"
+                },
+                "tooltip": {
+                  "mode": "single",
+                  "yHistogram": true
+                },
+                "yAxis": {
+                  "axisPlacement": "left",
+                  "unit": "dB"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-95": {
+        "kind": "Panel",
+        "spec": {
+          "id": 95,
+          "title": "LAeq 1 s distribution",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "$col $tag_location",
+                        "query": "SELECT \"laeq_1s\" FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"laeq_1s\" > 20 AND $timeFilter GROUP BY \"location\"",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "histogram",
+            "version": "",
+            "spec": {
+              "options": {
+                "bucketSize": 2,
+                "legend": {
+                  "showLegend": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "dB",
+                  "min": 20
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-96": {
+        "kind": "Panel",
+        "spec": {
+          "id": 96,
+          "title": "Passes (selected range)",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "$tag_location",
+                        "query": "SELECT count(\"pass_lafmax\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND $timeFilter GROUP BY \"location\"",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "blue"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "blue"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-97": {
+        "kind": "Panel",
+        "spec": {
+          "id": 97,
+          "title": "Passes by loudness (per bucket, selected units summed)",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "< 60 dB",
+                        "query": "SELECT count(\"pass_lafmax\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"pass_lafmax\" < 60 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "60–70 dB",
+                        "query": "SELECT count(\"pass_lafmax\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"pass_lafmax\" >= 60 AND \"pass_lafmax\" < 70 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "70–80 dB",
+                        "query": "SELECT count(\"pass_lafmax\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"pass_lafmax\" >= 70 AND \"pass_lafmax\" < 80 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "≥ 80 dB",
+                        "query": "SELECT count(\"pass_lafmax\") FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND \"pass_lafmax\" >= 80 AND $timeFilter GROUP BY time($__interval) fill(0)",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 60,
+                "interval": "10m"
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "custom": {
+                    "axisSoftMin": 0,
+                    "barAlignment": 1,
+                    "drawStyle": "bars",
+                    "fillOpacity": 85,
+                    "lineWidth": 0,
+                    "showPoints": "never",
+                    "spanNulls": true,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "normal"
+                    }
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "< 60 dB"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "green",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "60–70 dB"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "yellow",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "70–80 dB"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "orange",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "≥ 80 dB"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "red",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-98": {
+        "kind": "Panel",
+        "spec": {
+          "id": 98,
+          "title": "Every pass: peak level (color = loudness)",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "influxdb",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "influx-noise"
+                      },
+                      "spec": {
+                        "alias": "pass $tag_location",
+                        "query": "SELECT \"pass_lafmax\" FROM \"noise\" WHERE \"location\" =~ /^$unit$/ AND $timeFilter GROUP BY \"location\"",
+                        "rawQuery": true,
+                        "resultFormat": "time_series"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "dB",
+                  "min": 45,
+                  "max": 95,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "transparent"
+                      },
+                      {
+                        "value": 75,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "continuous-GrYlRd"
+                  },
+                  "custom": {
+                    "axisSoftMax": 90,
+                    "axisSoftMin": 30,
+                    "drawStyle": "points",
+                    "fillOpacity": 0,
+                    "gradientMode": "scheme",
+                    "lineWidth": 0,
+                    "pointSize": 7,
+                    "showPoints": "always",
+                    "spanNulls": true,
+                    "thresholdsStyle": {
+                      "mode": "dashed"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
       }
     },
     "layout": {
@@ -1848,7 +2783,7 @@
                       "spec": {
                         "x": 0,
                         "y": 0,
-                        "width": 8,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
@@ -1859,9 +2794,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 8,
+                        "x": 6,
                         "y": 0,
-                        "width": 8,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
@@ -1872,9 +2807,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 16,
+                        "x": 12,
                         "y": 0,
-                        "width": 8,
+                        "width": 6,
                         "height": 4,
                         "element": {
                           "kind": "ElementReference",
@@ -1899,7 +2834,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 14,
+                        "y": 31,
                         "width": 24,
                         "height": 8,
                         "element": {
@@ -1912,7 +2847,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 22,
+                        "y": 39,
                         "width": 12,
                         "height": 7,
                         "element": {
@@ -1925,7 +2860,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 22,
+                        "y": 39,
                         "width": 12,
                         "height": 7,
                         "element": {
@@ -1938,7 +2873,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 29,
+                        "y": 46,
                         "width": 16,
                         "height": 8,
                         "element": {
@@ -1951,12 +2886,103 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 16,
-                        "y": 29,
+                        "y": 46,
                         "width": 8,
                         "height": 8,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-14"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 18,
+                        "y": 0,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-96"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 23,
+                        "width": 24,
+                        "height": 8,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-97"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 14,
+                        "width": 24,
+                        "height": 9,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-98"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "title": "Distribution",
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 11,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-94"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 11,
+                        "width": 24,
+                        "height": 10,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-93"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 21,
+                        "width": 24,
+                        "height": 7,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-95"
                         }
                       }
                     }

@@ -1,8 +1,12 @@
 # squid-detector
 
-Logs how loud passing cars are. ESP32 + INMP441 (A-weighted dB) + BME280 → InfluxDB 1.x (1 s) + Home Assistant (10 min) → Grafana.
+Logs how loud passing cars and motorcycles are, and counts the passes. ESP32 + INMP441 (A-weighted dB) + BME280 → InfluxDB 1.x (1 s) + Home Assistant (10 min) → Grafana.
 
-![Road noise, outdoor unit, last 20 min: one spike per passing car](docs/dashboard-noise.png)
+**Privacy:** no audio is recorded or transmitted. Levels are computed on-chip; only two numbers per second (`laeq_1s`, `lafmax_1s`) and one point per detected pass leave the device.
+
+![Road noise, outdoor unit, 2 h: levels, every pass colored by loudness, passes per 10 min by loudness class](docs/dashboard-noise.png)
+
+![Distribution: seconds per 5 dB band, LAmin / LAeq / LAmax scatter, histogram](docs/dashboard-distribution.png)
 
 ![Temperature, humidity, pressure: indoor vs. outdoor vs. Met.no forecast](docs/dashboard-weather.png)
 
@@ -51,7 +55,7 @@ Requires Home Assistant with add-ons **ESPHome**, **InfluxDB** (1.x), **Grafana*
    esphome run noise-indoor.yaml --device noise-indoor.local          # OTA
    ```
 5. Home Assistant: Settings → Devices → ESPHome device discovered → enter its `api_key` (or `bin/hactl.py add-esphome`).
-6. Check: `esphome logs noise-indoor.yaml --device noise-indoor.local` shows `Uploaded 15 + 15 points` every 15 s.
+6. Check: `esphome logs noise-indoor.yaml --device noise-indoor.local` shows `Uploaded 15 + 15 points, N passes` every 15 s.
 7. Grafana: add InfluxDB data sources, then import dashboards.
 
    | Data source UID | Database | User | Needed by |
@@ -64,6 +68,28 @@ Requires Home Assistant with add-ons **ESPHome**, **InfluxDB** (1.x), **Grafana*
    | `grafana/road-noise.json` | any | Dashboards → New → Import |
    | `grafana/road-noise-all.json` | 12+ (`dashboardNewLayouts`, v2 tabs) | `bin/README.md` → "Import a v2 dashboard" |
 8. Calibrate: reference meter (e.g. NIOSH SLM app) next to the mic for a few minutes; set `mic_offset` in the unit file (difference in dB); OTA.
+
+## Dashboard (`road-noise-all`)
+
+| Tab | Panels |
+|---|---|
+| Road noise | LAeq now / range, loudest pass, passes (range); LAeq + LAFmax per bucket; every pass as a dot (color = peak dB); passes per bucket stacked by loudness (< 60 / 60–70 / 70–80 / ≥ 80 dB); L10 / L50 / L90; seconds ≥ 75 dBA; histogram; 10-min summaries; loud events |
+| Distribution | heatmap: seconds per 5 dB band; LAmin / LAeq / LAmax scatter (≥ 10 s buckets); histogram |
+| Temperature & weather | BME280 vs. Met.no: temperature, humidity, pressure; wind |
+| Device health | Wi-Fi, buffer backlog, points per minute |
+
+`Unit` variable: indoor / outdoor / both. LAeq aggregates are energy averages.
+
+## Pass detection (firmware)
+
+| Step | Rule |
+|---|---|
+| Background | quietest 1 s LAeq in the last 60 s |
+| Start | LAFmax ≥ background + `pass_start_db` (8 dB) |
+| End | LAFmax < background + `pass_end_db` (4 dB), or after `pass_max_s` (30 s) |
+| Output | one Influx point per pass at its peak: `pass_lafmax`, `pass_bg`; HA `Passes 10min` |
+
+Counts passes, not vehicles: close-together vehicles merge, quiet ones (EVs at low speed) can be missed. Raw 1 s data is kept, so history can be recounted with other thresholds: `bin/recount_passes.py` (same rule, writes points tagged `src=backfill`).
 
 ## Add a unit
 
@@ -80,7 +106,8 @@ Requires Home Assistant with add-ons **ESPHome**, **InfluxDB** (1.x), **Grafana*
 | Log: `HTTP 400` | invalid value; firmware skips non-finite values (no mic → −inf) |
 | ~90 dBA in a quiet room, −300 dBA dropouts | loose SD/SCK/WS wire or unsoldered mic; then try `channel: right` |
 | `bme280 ... Communication failed` | wiring, or address `0x77` instead of `0x76`; only detected at boot |
-| HA shows 1 entity instead of 9 | HA Core older than the ESPHome firmware; update HA |
+| HA shows 1 entity instead of 10 | HA Core older than the ESPHome firmware; update HA |
+| Grafana panels show `502 Bad Gateway` | HA VM out of memory (Grafana + Scrypted + InfluxDB need > 2 GB; 4 GB works) |
 | Wi-Fi signal < −80 dBm | move closer to the AP |
 
 ## Layout
@@ -90,7 +117,7 @@ Requires Home Assistant with add-ons **ESPHome**, **InfluxDB** (1.x), **Grafana*
 | `esphome/noise-common.yaml` | all firmware logic |
 | `esphome/noise-{indoor,outdoor}.yaml` | name, tag, credential references |
 | `esphome/secrets.example.yaml` | template for git-ignored `secrets.yaml` |
-| `bin/` | `hactl.py` (HA/Influx/Grafana admin CLI), `make_secrets.sh`; see `bin/README.md` |
+| `bin/` | `hactl.py` (HA/Influx/Grafana admin CLI), `recount_passes.py` (pass detection on stored data), `make_secrets.sh`; see `bin/README.md` |
 | `grafana/` | dashboard exports |
 | `docs/` | screenshots |
 | `requirements.txt` | ESPHome CLI + `websockets` |
@@ -99,9 +126,9 @@ Requires Home Assistant with add-ons **ESPHome**, **InfluxDB** (1.x), **Grafana*
 
 | Store | Contents | Retention |
 |---|---|---|
-| Influx `noise` | measurement `noise`: `laeq_1s`, `lafmax_1s`, tag `location` | 2 y |
+| Influx `noise` | measurement `noise`: `laeq_1s`, `lafmax_1s` (1 s), `pass_lafmax`, `pass_bg` (per pass); tag `location` | 2 y |
 | Influx `homeassistant` | HA InfluxDB integration (optional): measurement = unit, tag `entity_id`, field `value` | 180 d |
-| HA | LAeq / LAmax / LAmin 10 min, loud events (> 75 dBA), temperature, humidity, pressure, Wi-Fi, backlog | recorder |
+| HA | LAeq / LAmax / LAmin 10 min, loud events (> 75 dBA), passes 10 min, temperature, humidity, pressure, Wi-Fi, backlog | recorder |
 
 Influx write: `http://<influx_host>:8086/write?db=noise&precision=s`, credentials in an `Authorization: Basic` header (ESPHome logs URLs on errors).
 
@@ -113,6 +140,7 @@ Influx write: `http://<influx_host>:8086/write?db=noise&precision=s`, credential
 | Upload | every 15 s, ≤ 300 points/series |
 | Offline buffer | 2400 s |
 | Loud event | LAFmax ≥ 75 dBA, 3 dB hysteresis |
+| Pass | background + 8 dB start / + 4 dB end, ≤ 30 s |
 | `mic_offset` | 0 dB (uncalibrated) |
 
 ## License
